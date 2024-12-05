@@ -1,0 +1,302 @@
+local Abbreviation = {}
+
+local TIME_PARSERS = {
+	{
+		Suffix = "d",
+
+		Parse = function(time)
+			return math.floor(time / 86400)
+		end,
+	},
+
+	{
+		Suffix = "h",
+
+		Parse = function(time)
+			return math.floor(time / 3600) % 24
+		end,
+	},
+	{
+		Suffix = "m",
+
+		Parse = function(time)
+			return math.floor(time / 60) % 60
+		end,
+	},
+
+	{
+		Suffix = "s",
+
+		Parse = function(time)
+			return time % 60
+		end,
+	},
+}
+
+function Abbreviation.Comma(n)
+	local str = string.format("%.f", n)
+	return #str % 3 == 0 and str:reverse():gsub("(%d%d%d)", "%1,"):reverse():sub(2) or str:reverse():gsub("(%d%d%d)", "%1,"):reverse()
+end
+
+function Abbreviation.findDecimal(str)
+	for i = 1, string.len(str) do
+		if string.sub(str, i, i) == "." then
+			return i
+		end
+	end
+end
+
+function Abbreviation.toHundreths(n, arb)
+	local str = tostring(n)
+	local decimal = Abbreviation.findDecimal(str)
+
+	if decimal then
+		return tonumber(string.sub(str,1,decimal-1).."."..string.sub(str,decimal+1,decimal+1)..string.sub(str,decimal+2,decimal+2))
+	else
+		return n 
+	end
+end
+
+function Abbreviation.Round(num, numDecimalPlaces)
+	if num == nil or numDecimalPlaces == nil then return end
+
+	if numDecimalPlaces and numDecimalPlaces>0 then
+		local mult = 10^numDecimalPlaces
+		return math.floor(num * mult + 0.5) / mult
+	end
+	return math.floor(num + 0.5)
+end
+
+function Abbreviation.CurrencCoinsding(num)
+	num = Abbreviation.Round(num, 2)
+
+	local str = num
+	local suffixes = {
+		"K", "M", "B", "T", "Qd", "Qn", "Sx", "Sp", "Oc", "No", "Dc", 
+		"Ud", "Dd", "Td", "QdD", "QnD", "SxD", "SpD", "OcD", "NoD", "Vg", 
+		"Uvg", "Dvg", "Tvg", "Qavg", "Qivg", "Sxvg", "Spvg", "Ocvg", "Nov",
+		"Tt", "Unt", "Dtt", "Ttt", "Qut", "Qat", "Sst", "Spt", "Oct", "Nvt",
+		"Qdt", "Qqt", "Sxt", "Sgt", "Oi", "Noi", "C", "Vgn", "Uvgn", "Dvgn", 
+		"Trvg", "Qdvn", "Qnvn", "Sxvn", "Spvn", "Ocvn", "Nvgn", "Cnn", "Ucnn", 
+		"Dcnn", "Trcn", "Qdcn", "Qncn", "Sxcn", "Spcn", "Occn", "Nvcn", "Mln", 
+		"Umln", "Dmln", "Trml", "Qdmn", "Qnmn", "Sxmn", "Spmn", "Ocmn", "Nvmn",
+		"CENT","UNCENT"
+	}
+
+	for i = #suffixes, 1, -1 do
+		local arb = math.pow(10, i * 3)
+		if num >= arb then
+			if suffixes[i] then
+				local targetString = string.gsub((num / arb), "/\.0$/", "")
+				if not targetString then
+					return tostring(num)
+				end
+
+				local hundreths = Abbreviation.toHundreths(targetString, arb)
+				if not hundreths then
+					return tostring(num)
+				end
+
+				str = hundreths .. suffixes[i]
+			end
+
+			break
+		end
+	end
+
+	return str
+end
+
+function Abbreviation.intToRoman(num)
+	local numberMap = {
+		{1000, "M"}, {900, "CM"}, {500, "D"}, {400, "CD"},
+		{100, "C"}, {90, "XC"}, {50, "L"}, {40, "XL"}, {10, "X"}, {9, "IX"},
+		{5, "V"}, {4, "IV"}, {1, "I"}
+	}
+	local roman = ""
+	while num > 0 do
+		for index,v in pairs(numberMap)do 
+			local romanChar = v[2]
+			local int = v[1]
+			while num >= int do
+				roman = roman..romanChar
+				num = num - int
+			end
+		end
+	end
+	return roman
+end
+
+function Abbreviation.ScientificNotation(num)
+	local str = num
+
+	local count = 0
+	for i = 1, 10 do
+		if str < 1 then
+			str = str * 10
+			count += 1
+		else
+			break
+		end
+	end
+
+	str = Abbreviation.Round(str, 1)
+	str = str.."e-"..count
+
+	return str
+end
+
+function Abbreviation.toTime(n)
+	local days = math.floor(n/86400)
+	local remaining = n % 86400
+	local hours = math.floor(remaining/3600)
+	remaining = remaining % 3600
+	local minutes = math.floor(remaining/60)
+	remaining = remaining % 60
+	local seconds = remaining
+	if (hours < 10) then
+		hours = tostring(hours)
+	end
+	if (minutes < 10) then
+		minutes = tostring(minutes)
+	end
+	if (seconds < 10) then
+		seconds = tostring(seconds)
+	end
+
+	return tostring(days).."d "..hours.."h "..minutes.."m "..math.floor(seconds) .. "s"
+end
+
+function Abbreviation.toTimeNoDay(n)
+	local hours = math.floor(n/3600)
+	local remaining = n % 3600
+	local minutes = math.floor(remaining/60)
+	remaining = remaining % 60
+	local seconds = remaining
+	if (hours < 10) then
+		hours = tostring(hours)
+	end
+	if (minutes < 10) then
+		minutes = tostring(minutes)
+	end
+	if (seconds < 10) then
+		seconds = tostring(seconds)
+	end
+
+	return hours.."h "..minutes.."m "..math.floor(seconds) .. "s"
+end
+
+function Abbreviation.toTimeNoMins(n)
+	local hours = math.floor(n/3600)
+	local remaining = n % 3600
+	local minutes = math.floor(remaining/60)
+	remaining = remaining % 60
+	local seconds = remaining
+	if (hours < 10) then
+		hours = tostring(hours)
+	end
+	if (minutes < 10) then
+		minutes = tostring(minutes)
+	end
+	if (seconds < 10) then
+		seconds = tostring(seconds)
+	end
+
+	return minutes.."m "..math.floor(seconds) .. "s"
+end
+
+function Abbreviation.toTimeNoSec(n)
+	local days = math.floor(n/86400)
+	local remaining = n % 86400
+	local hours = math.floor(remaining/3600)
+	remaining = remaining % 3600
+	local minutes = math.floor(remaining/60)
+	remaining = remaining % 60
+	local seconds = remaining
+	if (hours < 10) then
+		hours = tostring(hours)
+	end
+	if (minutes < 10) then
+		minutes = tostring(minutes)
+	end
+
+	return tostring(days).."d "..hours.."h "..minutes.."m"
+end
+
+function Abbreviation.clockFormat(n, ignoreFormatLimits: boolean?)
+	local time = n
+	if time <= 0 then
+		return "0s"
+	end
+
+	local formated = 0
+	local nextFormat = 0
+
+	local newTime = ""
+	for index, parser in TIME_PARSERS do
+		if not ignoreFormatLimits then
+			if nextFormat > 0 and index ~= nextFormat then
+				break
+			end
+		end
+
+		local parsedTime = parser.Parse(time)
+		if parsedTime > 0 and formated < 2 then
+			newTime ..= `{math.floor(parsedTime)}{parser.Suffix}, `
+			if not ignoreFormatLimits then
+				nextFormat = index + 1
+				formated += 1
+			end
+		end
+	end
+
+	return string.sub(newTime, 1, -3)
+end
+
+function Abbreviation.hoursMinsSeconds(n)
+	local hours = math.floor(n/3600)
+	local remaining = n % 3600
+	local minutes = math.floor(remaining/60)
+	remaining = remaining % 60
+	local seconds = remaining
+	if (hours < 10) then
+		hours = "0"..tostring(hours)
+	end
+	if (minutes < 10) then
+		minutes = "0"..tostring(minutes)
+	end
+	if (seconds < 10) then
+		seconds = "0"..tostring(seconds)
+	end
+
+	return hours..":"..minutes..":"..seconds
+end
+
+function Abbreviation.minsSeconds(n)
+	local remaining = n % 3600
+	local minutes = math.floor(remaining/60)
+	remaining = remaining % 60
+	local seconds = remaining
+
+	if (minutes < 10) then
+		minutes = "0"..tostring(minutes)
+	end
+	if (seconds < 10) then
+		seconds = "0"..tostring(seconds)
+	end
+
+	return minutes..":"..seconds
+end
+
+
+function Abbreviation.Simple(Amount)
+	Amount = if typeof(Amount) == "string" then tonumber(Amount) else Amount
+	
+	if Amount < 1_000_000 then
+		return Abbreviation.Comma(Amount)
+	else
+		return Abbreviation.CurrencCoinsding(Amount)
+	end
+end
+
+return Abbreviation
